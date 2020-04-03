@@ -174,7 +174,7 @@ class Isosurface (Surface):
         """
         self.isovalue = isovalue
         self.rtol = rtol
-        super(Isosurface, self).__init__(parent_cube, indices, values)
+        super().__init__(parent_cube, indices, values)
 
 
 class MappedSurface (Surface):
