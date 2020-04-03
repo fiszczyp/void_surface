@@ -10,7 +10,7 @@ __author__ = "Filip T. Szczypiński"
 
 class Cube:
     """
-    Represents a CUBE file.
+    Represents a CUBE stored in a cubegen ``.cube`` file.
 
     Attributes
     ----------
@@ -18,19 +18,19 @@ class Cube:
         Atoms saved in the cube file in the format [atomic_number, x, y, z].
 
     cube_path : str
-        Path to the CUBE file containing the data.
+        Path to the ``.cube`` file containing the data.
 
     cube_type : str
-        Type of the calculation stored in the CUBE file.
+        Type of the calculation stored in the ``.cube`` file.
 
     natoms : int
-        Number of atoms in the CUBE file.
+        Number of atoms in the ``.cube`` file.
 
     nx, ny, nz : int
         Number of points in the three CUBE directions.
 
     origin : ndarray
-        Initial point of the CUBE file in the format [x0, y0, z0].
+        Initial point of the CUBE in the format [x0, y0, z0].
 
     unit : ndarry
         Unit vector within the CUBE in the format [x1, y1, z1].
@@ -106,23 +106,23 @@ class Cube:
 
 class Surface:
     """
-    Surface descriptors.
+    Describes a surface generated from a cubegen ``.cube`` file.
 
     Attributes
     ----------
-    parent_cube : :class:`Cube`
-        The CUBE from which the surface is generated.
+    parent_cube : Cube
+        The Cube from which the surface is generated.
 
     """
 
     def __init__(self, parent_cube, indices, values):
         """
-        Initialise a class:`Surface`.
+        Initialise a Surface.
 
         Parameters
         ----------
         parent_cube : Cube
-            The CUBE from which the surface is generated.
+            The Cube from which the surface is generated.
 
         indices : iterable of tuples of int
             The x, y, z indices of the points on the surface.
@@ -133,4 +133,87 @@ class Surface:
         """
         self.parent_cube = parent_cube
         self.indices = indices
+        self.values = values
+
+
+class Isosurface (Surface):
+    """
+    Describes an isosurface of any property.
+
+    Attributes
+    ----------
+    isovalue : float
+        The isovalue for which the isosurface was generated.
+
+    rtol : float
+        The relative tolerance in the isovalue values.
+
+    """
+
+    def __init__(self, parent_cube, isovalue, rtol, indices, values):
+        """
+        Initialise an Isosurface.
+
+        Parameters
+        ----------
+        parent_cube : Cube
+            The Cube from which the surface is generated.
+
+        isovalue : float
+            The isolvalue for which the isosurface was generated.
+
+        rtol : float
+            The relative tolenrance in the isovalue value.
+
+        indices : iterable of tuples of int
+            The x, y, z indices of the points on the surface.
+
+        values : iterable of float
+            The values of the points on the surface.
+
+        """
+        self.isovalue = isovalue
+        self.rtol = rtol
+        super(Isosurface, self).__init__(parent_cube, indices, values)
+
+
+class MappedSurface (Surface):
+    """
+    Describes values mapped onto another surface.
+
+    Describes values of some property mapped onto another surface. The most
+    obvious application is mapping the electrostatic potential onto an
+    electornic density isosurfac to create the corresponding molecular
+    electorstatic potential surface (MEPS).
+
+    Attributes
+    ----------
+    surface : Surface
+        The Surface onto which the property is mapped.
+
+    mapped_cube : Cube
+        The Cube containing the values mapped onto the Surface.
+
+    """
+
+    def __init__(self, surface, mapped_cube, values):
+        """
+        Initialise a MappedSurface.
+
+        Parameters
+        ----------
+        surface : Surface
+            The Surface onto which the property is mapped.
+
+        mapped_cube : Cube
+            The Cube containing the values mapped onto the Surface.
+
+        values : iterable of float
+            The values of the points on the surface.
+
+        """
+        self.surface = surface
+        self.mapped_cube = mapped_cube
+        self.parent_cube = self.surface.parent_cube
+        self.indices = self.surface.indices
         self.values = values
