@@ -2,8 +2,9 @@
 
 import numpy as np
 # import pickle as p
-# from scipy.spatial import KDTree
-# from scipy.spatial.distance import euclidean
+from scipy.spatial import KDTree
+from scipy.spatial.distance import euclidean
+from copy import copy
 
 __author__ = "Filip T. Szczypiński"
 
@@ -139,7 +140,7 @@ class Cube:
                                 indices.append((x, y, z*6 + i))
                                 values.append(value)
 
-            return Isosurface(self, isovalue, rtol, indices, values)
+            return Isosurface(self, isovalue, rtol, atol, indices, values)
 
     def get_centre_of_mass(self):
         """
@@ -242,6 +243,86 @@ class Surface:
         """
         return self.indices * self.parent_cube.unit + self.parent_cube.origin
 
+    def get_void_surface(self, removeHs=False):
+        """
+        Approximate which surface points lie within the internal void.
+
+        Parameters
+        ----------
+        removeHs : bool, optional
+            If True, hydrogen atoms will be removed prior to the approximation
+            of the void points (default is False).
+
+        Returns
+        -------
+        list of [ndarray, float]
+            An array of the void surface points in the form [(x, y, z), value],
+            where the x, y, z are the **CUBE indices** (not the coordinates).
+
+        list of [ndarray, float]
+            An array of the outside surface points in the form
+            [(x, y, z), value], where the x, y, z are the **CUBE indices**
+            (not the coordinates).
+
+        Notes
+        -----
+        Currently, the method uses KDTrees to find the five atoms nearest to
+        the surface point in question and then determines whether any of those
+        atoms lies closer to the molecule's centre of mass than the point. If
+        all atoms are further away from the centre than the point, then the
+        point is deemed to be inside the cavity. Albeit crude, this protocol
+        seems reasonably accurate at estimating the surface points within the
+        void of non-convex cages.
+
+        Furthermore, the method copies the original Surface instance in order
+        to keep the remaining properties the same, hence can be thught of as
+        returning a "subset" of the original surface under investigation.
+
+        """
+        if removeHs:
+            atoms = self.parent_cube.atoms[self.parent_cube.atoms[:, 0] > 1]
+        else:
+            atoms = self.parent_cube.atoms
+
+        coords = self.get_coords()
+
+        kdtree = KDTree(atoms[:, 1:])
+        distances, atom_ids = kdtree.query(coords, 5)
+
+        void_points = list()
+        void_values = list()
+        outside_points = list()
+        outside_values = list()
+
+        a_dist = dict()
+
+        for a, a_xyz in enumerate(atoms[:, 1:]):
+            a_dist[a] = euclidean(self.parent_cube.centre_of_mass, a_xyz)
+
+        for n, point in enumerate(coords):
+            near = atom_ids[n]
+            pdist = euclidean(self.parent_cube.centre_of_mass, point)
+
+            inside = False if any(a_dist[i] < pdist for i in near) else True
+
+            if inside:
+                void_points.append(self.indices[n])
+                void_values.append(self.values[n])
+
+            else:
+                outside_points.append(self.indices[n])
+                outside_values.append(self.values[n])
+
+        void = copy(self)
+        void.indices = np.array(void_points)
+        void.values = np.array(void_values)
+
+        outside = copy(self)
+        outside.indices = np.array(outside_points)
+        outside.values = np.array(outside_values)
+
+        return void, outside
+
 
 class Isosurface (Surface):
     """
@@ -292,6 +373,7 @@ class Isosurface (Surface):
         """
         self.isovalue = isovalue
         self.rtol = rtol
+        self.atol = atol
         super().__init__(parent_cube, indices, values)
 
 
