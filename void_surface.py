@@ -148,23 +148,6 @@ class Cube:
 
             return Isosurface(self, isovalue, rtol, atol, indices, values)
 
-    def get_centre_of_mass(self):
-        """
-        Get the geometric centre of mass of the molecule in the `Cube`.
-
-        Returns
-        -------
-        ndarray
-            An array with the [x, y, z] coordinates (in Angstrom) of the centre
-            of mass of the molecule stored ``.cube`` file.
-
-        Notes
-        -----
-        No weighting is done based on the atomic numbers.
-
-        """
-        return np.average(self.atoms[:, 1:], axis=0)
-
     def get_value(self, x, y, z):
         """
         Get the value of the point with CUBE indices [x, y, z].
