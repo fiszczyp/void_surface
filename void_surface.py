@@ -1,7 +1,6 @@
 """Analysis of cubegen CUBEs to visualise void surfaces."""
 
 import numpy as np
-# import pickle as p
 from scipy.spatial import KDTree
 from scipy.spatial.distance import euclidean
 from copy import copy
