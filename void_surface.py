@@ -296,7 +296,12 @@ class Surface:
             points on the surface.
 
         """
-        return self.indices * self.parent_cube.unit + self.parent_cube.origin
+        if self.indices.size == 0:
+            return self.indices
+        else:
+            coords = self.indices * self.parent_cube.unit + \
+                self.parent_cube.origin
+            return coords
 
     def get_void_surface(self, removeHs=False):
         """
