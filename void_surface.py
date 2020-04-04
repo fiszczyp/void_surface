@@ -123,8 +123,7 @@ class Cube:
         volume of the molecule.
 
         """
-        # There are maximum 6 z values per line
-        lines = int(self.nz / 6) if self.nz % 6 == 0 else int(self.nz / 6) + 1
+        z_lines = self._get_z_lines()
         indices = list()
         values = list()
 
@@ -135,7 +134,7 @@ class Cube:
 
             for x in range(self.nx):
                 for y in range(self.ny):
-                    for z in range(lines):
+                    for z in range(z_lines):
                         zs = map(float, f.readline().split())
                         for i, value in enumerate(zs):
                             if np.isclose(
@@ -165,6 +164,55 @@ class Cube:
 
         """
         return np.average(self.atoms[:, 1:], axis=0)
+
+    def get_value(self, x, y, z):
+        """
+        Get the value of the point with CUBE indices [x, y, z].
+
+        Parameters
+        ----------
+        x, y, z : int
+            Indices in the three CUBE directions.
+
+        Returns
+        -------
+        float
+            Value at the point with CUBE indices [x, y, z].
+
+        """
+        z_lines = self._get_z_lines()
+
+        with open(self.cube_path, 'r') as f:
+            # Skip the comments and Cube properties.
+            skip = self.natoms + 6
+            # Get to the required x value
+            skip += x * self.ny * z_lines
+            # Get to the required y value
+            skip += y * z_lines
+            # Get to the required z line
+            skip += int(z/6)
+
+            for _ in range(skip):
+                next(f)
+
+            values = f.readline().split()
+
+        return values[z % 6]
+
+    def _get_z_lines(self):
+        """
+        Get the number of lines per z index in the ``.cube`` file.
+
+        Each values line of the ``.cube`` file contains up to six values and
+        it is not filled if z indices run out.
+
+        Returns
+        -------
+        int
+            The number of lines per z value.
+
+        """
+        return int(self.nz / 6) if self.nz % 6 == 0 else int(self.nz / 6) + 1
 
     def set_path(self, path):
         """
@@ -331,6 +379,20 @@ class Surface:
         outside.values = np.array(outside_values)
 
         return void, outside
+
+    def map_surface(self, mapped_cube):
+        """
+        Map values from a ``.cube`` file onto the surface.
+
+        Returns
+        -------
+        `MappedSurface`
+            A surface with new values mapped onto the existing surface.
+
+        """
+        # mapped_surface = MappedSurface(self, mapped_cube, map_values)
+        # for i, (x, y, z) in enumerate(mapped_surface.indices):
+        #     pass
 
 
 class Isosurface (Surface):
