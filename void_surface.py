@@ -293,18 +293,20 @@ class Surface:
 
         coords = self.get_coords()
 
+        # Find five nearest atoms to each surface point.
         kdtree = KDTree(atoms[:, 1:])
         distances, atom_ids = kdtree.query(coords, 5)
 
+        # Calculate distances from CoM to each atom.
+        a_dist = dict()
+        for a, a_xyz in enumerate(atoms[:, 1:]):
+            a_dist[a] = euclidean(self.parent_cube.centre_of_mass, a_xyz)
+
+        # Compare distances of the atoms and surface points to CoM.
         void_points = list()
         void_values = list()
         outside_points = list()
         outside_values = list()
-
-        a_dist = dict()
-
-        for a, a_xyz in enumerate(atoms[:, 1:]):
-            a_dist[a] = euclidean(self.parent_cube.centre_of_mass, a_xyz)
 
         for n, point in enumerate(coords):
             near = atom_ids[n]
