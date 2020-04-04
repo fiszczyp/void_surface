@@ -1,4 +1,4 @@
-"""Analysis of cubegen CUBE files to visualise void surfaces."""
+"""Analysis of cubegen CUBEs to visualise void surfaces."""
 
 import numpy as np
 # import pickle as p
@@ -14,8 +14,11 @@ class Cube:
 
     Attributes
     ----------
-    atoms : list
-        Atoms saved in the cube file in the format [atomic_number, x, y, z].
+    atoms : ndarray
+        Atoms in the ``.cube`` file in the format [atomic_number, x, y, z].
+
+    centre_of_mass : ndarray
+            An array with the [x, y, z] coordinates of the centre of mass.
 
     cube_path : str
         Path to the ``.cube`` file containing the data.
@@ -39,18 +42,18 @@ class Cube:
 
     def __init__(self, path, cube_type):
         """
-        Initialise a :class:`Cube` from a cubegen ``.cube`` file.
+        Initialise a `Cube` from a cubegen ``.cube`` file.
 
         Parameters
         ----------
-        path : :class:`str`
-            Path to the CUBE file.
+        path : str
+            Path to the ``.cube`` file.
 
-        cube_type : :class:`str`
-            Type of the CUBE file (e.g. 'potential' or 'density').
+        cube_type : str
+            Type of the ``.cube`` file (e.g. 'potential' or 'density').
 
         """
-        self.cpath = path
+        self.cube_path = path
         self.cube_type = cube_type
 
         with open(f'{path}', 'r') as f:
@@ -75,30 +78,96 @@ class Cube:
 
             # z increments and unit vector.
             u = f.readline().split()
-            self.n_z = int(u[0])
+            self.nz = int(u[0])
             z1 = np.array([float(x) for x in u[1:]])
 
             self.unit = x1 + y1 + z1
 
             # Read atoms.
-            self.atoms = list()
+            atoms = list()
             for _ in range(self.natoms):
                 line = f.readline().split()
                 anum, _, x, y, z = int(line[0]), *map(float, line[1:])
-                self.atoms.append([anum, x, y, z])
+                atoms.append([anum, x, y, z])
+
+            self.atoms = np.array(atoms)
+            self.centre_of_mass = np.average(self.atoms[:, 1:], axis=0)
+
+    def generate_isosurface(self, isovalue, rtol=0.01, atol=1E-30):
+        """
+        Generate the isosurface for a given value.
+
+        Parameters
+        ----------
+        isovalue : float
+            The target isovalue of the points on the isosurface.
+
+        rtol : float, optional
+            The relative tolerance parameter (the default is 1E-2).
+
+        atol : float, optional
+            The absolute tolerance parameter (the default is 1E-30).
+
+        Returns
+        -------
+        `Isosurface`
+            The isovalue surface.
+
+        """
+        # There are maximum 6 z values per line
+        lines = int(self.nz / 6) if self.nz % 6 == 0 else int(self.nz / 6) + 1
+        indices = list()
+        values = list()
+
+        with open(self.cube_path, 'r') as f:
+            # Skip the comments and Cube properties.
+            for _ in range(self.natoms + 6):
+                next(f)
+
+            for x in range(self.nx):
+                for y in range(self.ny):
+                    for z in range(lines):
+                        zs = map(float, f.readline().split())
+                        for i, value in enumerate(zs):
+                            if np.isclose(
+                                value,
+                                isovalue,
+                                rtol=rtol,
+                                atol=atol
+                            ):
+                                indices.append((x, y, z*6 + i))
+                                values.append(value)
+
+            return Isosurface(self, isovalue, rtol, indices, values)
+
+    def get_centre_of_mass(self):
+        """
+        Get the geometric centre of mass of the molecule in the `Cube`.
+
+        Returns
+        -------
+        ndarray
+            An array with the [x, y, z] coordinates of the centre of mass.
+
+        """
+        return np.average(self.atoms[:, 1:], axis=0)
 
     def set_path(self, path):
         """
         Update the path to the ``.cube`` file.
 
         Allows the user to update the path to the ``.cube`` file. Might be
-        useful if the Cube instance was loaded (e.g. unpickled) and the
+        useful if the `Cube` instance was loaded (e.g. unpickled) and the
         original ``.cube`` file was moved to another location.
 
         Parameters
         ----------
         path : str
             New path to the ``.cube`` file.
+
+        Returns
+        -------
+        None
 
         """
         self.cube_path = path
@@ -108,20 +177,39 @@ class Surface:
     """
     Describes a surface generated from a cubegen ``.cube`` file.
 
+    Surfaces reference the parent `Cube` instances from which they were
+    generated to allow the user to quickly inspect the properties of the
+    calculation, such as its type or grid spacing.
+
     Attributes
     ----------
-    parent_cube : Cube
+    indices : ndarray
+        The indices of the points on the surface in the format [x, y, z].
+
+    parent_cube : `Cube`
         The Cube from which the surface is generated.
+
+    values : ndarray
+        The values of the points on the surface.
+
+
+    Notes
+    -----
+    The points are defined by the [x, y, z] indices within the CUBE (**not**
+    the coordinates) and hence are physically meaningless without the Cube.
+    This means that Surface objects generated on `Cube`s with different grid
+    spacings can only be compared once the indices are multiplied by the
+    unit vectors of the correspondinge `Cube`s.
 
     """
 
     def __init__(self, parent_cube, indices, values):
         """
-        Initialise a Surface.
+        Initialise a `Surface`.
 
         Parameters
         ----------
-        parent_cube : Cube
+        parent_cube : `Cube`
             The Cube from which the surface is generated.
 
         indices : iterable of tuples of int
@@ -132,38 +220,49 @@ class Surface:
 
         """
         self.parent_cube = parent_cube
-        self.indices = indices
-        self.values = values
+        self.indices = np.array(indices)
+        self.values = np.array(values)
 
 
 class Isosurface (Surface):
     """
     Describes an isosurface of any property.
 
+    Isosurfaces contain points of the same value (`isovalue`) of a given
+    property (e.g. electronic density). Relative tolerance (`rtol`) is applied
+    to account for discontinuity and numerical errors in a form
+    `rtol` * `abs(isovalue)`.
+
     Attributes
     ----------
+    atol : float
+        The absolute tolerance parameter in the isovalue values.
+
     isovalue : float
         The isovalue for which the isosurface was generated.
 
     rtol : float
-        The relative tolerance in the isovalue values.
+        The relative tolerance parameter in the isovalue values.
 
     """
 
-    def __init__(self, parent_cube, isovalue, rtol, indices, values):
+    def __init__(self, parent_cube, isovalue, rtol, atol, indices, values):
         """
         Initialise an Isosurface.
 
         Parameters
         ----------
-        parent_cube : Cube
+        parent_cube : `Cube`
             The Cube from which the surface is generated.
 
         isovalue : float
-            The isolvalue for which the isosurface was generated.
+            The isovalue for which the isosurface was generated.
 
         rtol : float
-            The relative tolenrance in the isovalue value.
+            The relative toleramce in the isovalue value.
+
+        atol : float
+            The absolute toleramce in the isovalue value.
 
         indices : iterable of tuples of int
             The x, y, z indices of the points on the surface.
@@ -188,24 +287,24 @@ class MappedSurface (Surface):
 
     Attributes
     ----------
-    surface : Surface
+    surface : `Surface`
         The Surface onto which the property is mapped.
 
-    mapped_cube : Cube
+    mapped_cube : `Cube`
         The Cube containing the values mapped onto the Surface.
 
     """
 
     def __init__(self, surface, mapped_cube, values):
         """
-        Initialise a MappedSurface.
+        Initialise a `MappedSurface`.
 
         Parameters
         ----------
-        surface : Surface
+        surface : `Surface`
             The Surface onto which the property is mapped.
 
-        mapped_cube : Cube
+        mapped_cube : `Cube`
             The Cube containing the values mapped onto the Surface.
 
         values : iterable of float
