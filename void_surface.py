@@ -42,7 +42,7 @@ class Cube:
 
     """
 
-    def __init__(self, path, cube_type):
+    def __init__(self, path, cube_type=''):
         """
         Initialise a `Cube` from a cubegen ``.cube`` file.
 
@@ -51,7 +51,7 @@ class Cube:
         path : str
             Path to the ``.cube`` file.
 
-        cube_type : str
+        cube_type : str, optional
             Type of the ``.cube`` file (e.g. 'potential' or 'density').
 
         """
@@ -183,7 +183,7 @@ class Cube:
         z_lines = self._get_z_lines()
 
         with open(self.cube_path, 'r') as f:
-            # Skip the comments and Cube properties.
+            # Skip the comments, properties, and atomic positions.
             skip = self.natoms + 6
             # Get to the required x value
             skip += x * self.ny * z_lines
@@ -389,15 +389,35 @@ class Surface:
         """
         Map values from a ``.cube`` file onto the surface.
 
+        Parameters
+        ----------
+        mapped_cube : Cube
+            The Cube holding the values to be mapped onto the surface.
+
         Returns
         -------
         `MappedSurface`
             A surface with new values mapped onto the existing surface.
 
         """
-        # mapped_surface = MappedSurface(self, mapped_cube, map_values)
-        # for i, (x, y, z) in enumerate(mapped_surface.indices):
-        #     pass
+        map_values = list()
+        z_lines = mapped_cube._get_z_lines()
+
+        with open(mapped_cube.cube_path, 'r') as f:
+            for _ in range(mapped_cube.natoms + 6):
+                next(f)
+
+            zs = list(map(float, f.readline().split()))
+            line = 0
+
+            for x, y, z in self.indices:
+                target = x * mapped_cube.ny * z_lines + y * z_lines + int(z/6)
+                while line < target:
+                    zs = list(map(float, f.readline().split()))
+                    line += 1
+                map_values.append(zs[z % 6])
+
+        return MappedSurface(self, mapped_cube, map_values)
 
 
 class Isosurface (Surface):
@@ -492,4 +512,4 @@ class MappedSurface (Surface):
         self.mapped_cube = mapped_cube
         self.parent_cube = self.surface.parent_cube
         self.indices = self.surface.indices
-        self.values = values
+        self.values = np.array(values)
