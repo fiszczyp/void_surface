@@ -111,3 +111,4 @@ venv.bak/
 input/*
 output/*
 *test.py
+test.cube

@@ -18,7 +18,8 @@ class Cube:
         Atoms in the ``.cube`` file in the format [atomic_number, x, y, z].
 
     centre_of_mass : ndarray
-            An array with the [x, y, z] coordinates of the centre of mass.
+        An array with the [x, y, z] coordinates (in Angstrom) of the centre of
+        mass of the molecule stored in the ``.cube`` file.
 
     cube_path : str
         Path to the ``.cube`` file containing the data.
@@ -147,7 +148,12 @@ class Cube:
         Returns
         -------
         ndarray
-            An array with the [x, y, z] coordinates of the centre of mass.
+            An array with the [x, y, z] coordinates (in Angstrom) of the centre
+            of mass of the molecule stored ``.cube`` file.
+
+        Notes
+        -----
+        No weighting is done based on the atomic numbers.
 
         """
         return np.average(self.atoms[:, 1:], axis=0)
@@ -222,6 +228,19 @@ class Surface:
         self.parent_cube = parent_cube
         self.indices = np.array(indices)
         self.values = np.array(values)
+
+    def get_coords(self):
+        """
+        Get the [x, y, z] coordinates of the points on the surface.
+
+        Returns
+        -------
+        ndarray
+            The array containing the [x, y, z] coordinates (in Angstrom) of the
+            points on the surface.
+
+        """
+        return self.indices * self.parent_cube.unit + self.parent_cube.origin
 
 
 class Isosurface (Surface):
