@@ -95,14 +95,15 @@ class Cube:
             self.atoms = np.array(atoms)
             self.centre_of_mass = np.average(self.atoms[:, 1:], axis=0)
 
-    def generate_isosurface(self, isovalue, rtol=0.01, atol=1E-30):
+    def generate_isosurface(self, isovalue=0.0004, rtol=0.01, atol=1E-30):
         """
         Generate the isosurface for a given value.
 
         Parameters
         ----------
-        isovalue : float
-            The target isovalue of the points on the isosurface.
+        isovalue : float, optional
+            The target isovalue of the points on the isosurface (the default is
+            0.0004).
 
         rtol : float, optional
             The relative tolerance parameter (the default is 1E-2).
@@ -114,6 +115,12 @@ class Cube:
         -------
         `Isosurface`
             The isovalue surface.
+
+        Notes
+        -----
+        The default isovalue corresponds to 0.0004 a.u. of the total electron
+        density distribution, which has been found to accurately define the
+        volume of the molecule.
 
         """
         # There are maximum 6 z values per line
